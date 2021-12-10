@@ -1,0 +1,64 @@
+add_filter( 'gform_validation_11', 'post_to_third_party_new' );
+function post_to_third_party_new( $validation_result ) {
+ 
+    $form  = $validation_result['form'];
+    $entry = GFFormsModel::get_current_lead();
+ 
+    $post_url = 'https://my.rentfaxpro.com/integration/report';
+    $body = array(
+        'apiKey' => '1323bd4b-146e-44bd-bd7c-e9c931f2ad13',
+        'reportCode' => 'RENT-REPORT',
+		'address' => rgar( $entry, '4.1' ),
+		'city' => rgar( $entry, '4.3' ),
+		'state' => rgar( $entry, '4.4' ),
+		'zip' => rgar( $entry, '4.5' ),
+		'propertyType' => rgar( $entry, '10'),
+		'bedrooms' => rgar( $entry, '15' ),
+        'bathrooms' => rgar( $entry, '14' ),
+		'squareFeet' => rgar( $entry, '25' ),
+        );
+	
+     $request = new WP_Http();
+     $response = $request->post( $post_url, array( 	'timeout' => 45,'redirection' => 5,'httpversion' => '1.0','blocking' => true,'headers' => array(),
+	 'body' => $body )); 	 
+   
+	
+	 $reportid = $response['body'];
+	 $post_report_url = 'https://my.rentfaxpro.com/integration/report/pdf';
+	
+     if (!empty($reportid)) {
+		 
+		$request_report = new WP_Http();
+        $response_report = $request_report->post( $post_report_url, array( 'timeout' => 45,'redirection' => 5,'httpversion' => '1.0','blocking' => true,'headers' => array('ContentType' => 'Application/pdf'),'body' => array('apiKey' => '1323bd4b-146e-44bd-bd7c-e9c931f2ad13', 'reportId' => $reportid)));	 
+	
+		
+       	$data = $response_report['body'];
+       header('Content-Type: application/pdf');
+       echo $data; 
+	  
+	  
+	 }
+	 else {
+		 
+		  
+		  // validation failed
+        $validation_result['is_valid'] = false;
+ 
+        //finding Field with ID of 1 and marking it as failed validation
+        foreach ( $form['fields'] as &$field ) {
+ 
+            //NOTE: replace 1 with the field you would like to validate
+            if ( $field->id == '4' ) {
+                $field->failed_validation  = true;
+                $field->validation_message = 'Please Enter a Valid Address';
+                break;
+            }
+        }
+    
+		  //Assign modified $form object back to the validation result
+		  
+         $validation_result['form'] = $form;
+ 
+         return $validation_result; 
+   }	 
+}
